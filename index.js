@@ -13,7 +13,10 @@ var through = require('through2'),
 //   }
 // }
 function fontminWrapper(options) {
-  // var options = options || {};
+  // here we cache  all the extracted Chinese glyphs, once all extraction 
+  // tasks are done it will be used in the stream flush function to generate
+  // the required fonts.
+  var glyphListCacheStr = '';
 
   if (!options.extractionAlgorithm) {
     options.extractionAlgorithm = function (text) {
@@ -31,9 +34,6 @@ function fontminWrapper(options) {
 
   // creating a stream through which each file will pass
   return through.obj(function(file, enc, cb) {
-    var fontmin = null,
-        _this = this;
-
     if (file.isNull()) {
       this.emit('error', new gutil.PluginError('empty file not supported!'));
       return cb();
@@ -44,11 +44,30 @@ function fontminWrapper(options) {
       return cb();
     }
 
+    glyphListCacheStr += options.extractionAlgorithm(file.contents.toString('utf8'));
+
+    cb();
+  }, function(flushCb){
+    var fontmin = null,
+        _this = this;
+
+    // remove duplication
+    glyphListCacheStr = (function(str){
+      var o = {},
+          list=str.split(''),
+          i;
+
+      for (i=0; i<list.length; i++) {
+        o[list[i]]=1;
+      }
+
+      return Object.keys(o).join('');
+    }(glyphListCacheStr + options.mustHaveGlyphs));
+
     fontmin = new Fontmin()
       .src(options.fontPath)
       .use(Fontmin.glyph({
-          text: options.extractionAlgorithm(file.contents.toString('utf8')) +
-            options.mustHaveGlyphs
+          text: glyphListCacheStr
       }))
       .use(Fontmin.ttf2eot())
       .use(Fontmin.ttf2woff())
@@ -57,15 +76,15 @@ function fontminWrapper(options) {
 
     fontmin.run(function (err, files) {
       if (err) {
-        _this.emit('error', gutil.PluginError(err));
-        return cb();
+        _this.emit('error', new gutil.PluginError(err));
+        return flushCb();
       }
 
       for (var i=0; i<files.length; i++) {
         _this.push(files[i]);
       }
 
-      cb();
+      flushCb();
     });
   });
 }

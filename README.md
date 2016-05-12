@@ -6,7 +6,6 @@ Samelessly integrate `Fontmin` with gulp.
 ```
 ...
 var foo = require('gulp-foo'),
-    concat = require('gulp-concat'),
     fontminWrapper = require('gulp-fontmin-wrapper'),
     bar = require('gulp-bar');
 
@@ -18,10 +17,9 @@ gulp.task('fontmin', function () {
       path.join(assetRoot, './js/**/*.js')
   ];
 
+  // all the src files MUST be plain text with 'utf-8' encoding, so that
+  // from them the Chinese glyphs can be correctly extracted.
   gulp.src(srcFiles)
-    // very important, gulp-concat is a dependency.
-    // here we combine all the texts together and extract glyphs from it
-    .pipe(concat('fake.file.in.memory'))
     .pipe(fontminWrapper({
         // how to extract the chinese glyphs. by default it keeps `u4e00-u9fa5` and drop all others.
         // extractionAlgorithm: function (text) {return text.replace('foo', 'bar');},
